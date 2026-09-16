@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SISTEMA TÁCTICO CONECTA-4 // ADVERSARIAL IA</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --neon-cyan: #00f0ff;
+            --neon-blue: #0088ff;
+            --neon-amber: #ffaa00;
+            --neon-red: #ff2a55;
+            --neon-green: #00ff88;
+            --hud-bg: rgba(6, 18, 32, 0.85);
+            --hud-panel-bg: rgba(10, 28, 48, 0.7);
+            --hud-border: rgba(0, 240, 255, 0.35);
+            --hud-glow: 0 0 15px rgba(0, 240, 255, 0.25);
+            --font-display: 'Orbitron', monospace;
+            --font-mono: 'Share Tech Mono', monospace;
+        }
+
+        body {
+            background-color: #030811;
+            background-image: 
+                radial-gradient(circle at 50% 20%, rgba(0, 136, 255, 0.12) 0%, transparent 60%),
+                linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+            color: #d1f4ff;
+            font-family: var(--font-mono);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 15px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Efecto scanline retro-futurista */
+        body::after {
+            content: " ";
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%);
+            background-size: 100% 4px;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            color: var(--neon-cyan);
+            font-size: 1.5rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            text-shadow: 0 0 12px rgba(0, 240, 255, 0.7);
+            margin-bottom: 2px;
+            text-align: center;
+        }
+
+        p.subtitle {
+            color: #5c9cb8;
+            font-size: 0.82rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+            text-align: center;
+        }
+
+        /* Barra de Navegación Segmentada Holográfica */
+        .segmented-nav {
+            background-color: rgba(5, 20, 36, 0.9);
+            padding: 4px;
+            border-radius: 4px;
+            display: inline-flex;
+            gap: 6px;
+            border: 1px solid var(--hud-border);
+            margin-bottom: 20px;
+            box-shadow: var(--hud-glow), inset 0 0 10px rgba(0, 240, 255, 0.1);
+            position: relative;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: #659bb5;
+            padding: 7px 22px;
+            font-family: var(--font-display);
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-transform: uppercase;
+        }
+
+        .nav-btn:hover {
+            color: var(--neon-cyan);
+            border-color: rgba(0, 240, 255, 0.4);
+            box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+        }
+
+        .nav-btn.active {
+            background: rgba(0, 240, 255, 0.15);
+            color: #ffffff;
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.5), inset 0 0 8px rgba(0, 240, 255, 0.3);
+            text-shadow: 0 0 6px var(--neon-cyan);
+        }
+
+        /* Contenedores */
+        .content-container {
+            width: 100%;
+            max-width: 1200px;
+            z-index: 10;
+        }
+
+        .tab-panel {
+            display: none;
+            animation: sciFiFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        @keyframes sciFiFadeIn {
+            from { opacity: 0; transform: scale(0.99) translateY(4px); filter: brightness(2); }
+            to { opacity: 1; transform: scale(1) translateY(0); filter: brightness(1); }
+        }
+
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.15fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 960px) {
+            .layout-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Paneles HUD con esquinas biseladas */
+        .card {
+            background: var(--hud-bg);
+            border: 1px solid var(--hud-border);
+            border-radius: 4px;
+            padding: 20px;
+            box-shadow: var(--hud-glow), inset 0 0 20px rgba(0, 40, 80, 0.5);
+            position: relative;
+            backdrop-filter: blur(8px);
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0;
+            width: 10px; height: 10px;
+            border-top: 2px solid var(--neon-cyan);
+            border-left: 2px solid var(--neon-cyan);
+        }
+
+        .card::after {
+            content: "";
+            position: absolute;
+            bottom: 0; right: 0;
+            width: 10px; height: 10px;
+            border-bottom: 2px solid var(--neon-cyan);
+            border-right: 2px solid var(--neon-cyan);
+        }
+
+        /* Tableros Holográficos */
+        .board-wrapper {
+            background: rgba(2, 12, 24, 0.85);
+            padding: 14px;
+            border: 1px solid rgba(0, 136, 255, 0.4);
+            border-radius: 4px;
+            width: fit-content;
+            margin: 0 auto 16px auto;
+            box-shadow: inset 0 0 15px rgba(0, 136, 255, 0.2);
+            position: relative;
+        }
+
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 42px);
+            grid-template-rows: repeat(6, 42px);
+            gap: 7px;
+        }
+
+        .cell {
+            width: 42px;
+            height: 42px;
+            background-color: rgba(3, 16, 30, 0.95);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .cell.interactive:hover {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+            transform: scale(1.06);
+        }
+
+        .cell.player-x {
+            background: radial-gradient(circle at 35% 35%, #ff7799, var(--neon-red) 70%, #600015);
+            border-color: var(--neon-red);
+            box-shadow: 0 0 14px rgba(255, 42, 85, 0.75), inset 0 0 6px #ffffff;
+            cursor: default;
+        }
+
+        .cell.player-o {
+            background: radial-gradient(circle at 35% 35%, #fff099, var(--neon-amber) 70%, #663d00);
+            border-color: var(--neon-amber);
+            box-shadow: 0 0 14px rgba(255, 170, 0, 0.75), inset 0 0 6px #ffffff;
+            cursor: default;
+        }
+
+        /* Controles y Formularios */
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.75rem;
+            color: #72b2d1;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-family: var(--font-display);
+        }
+
+        select {
+            width: 100%;
+            background: rgba(3, 14, 26, 0.95);
+            border: 1px solid rgba(0, 240, 255, 0.35);
+            color: var(--neon-cyan);
+            padding: 8px 12px;
+            border-radius: 3px;
+            font-family: var(--font-mono);
+            font-size: 0.88rem;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        select:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button.action-btn {
+            background: rgba(0, 136, 255, 0.2);
+            color: #ffffff;
+            border: 1px solid var(--neon-blue);
+            padding: 9px 15px;
+            border-radius: 3px;
+            font-family: var(--font-display);
+            font-weight: 700;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.78rem;
+            flex: 1;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        button.action-btn:hover {
+            background: rgba(0, 240, 255, 0.3);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+        }
+
+        button.action-btn.secondary {
+            background: rgba(30, 48, 70, 0.3);
+            border-color: #3b5a7a;
+            color: #a4c7e0;
+        }
+
+        button.action-btn.secondary:hover {
+            background: rgba(40, 68, 100, 0.5);
+            border-color: #6392c2;
+            color: #ffffff;
+        }
+
+        button.action-btn.warning {
+            background: rgba(255, 170, 0, 0.15);
+            border-color: var(--neon-amber);
+            color: #ffe08a;
+        }
+
+        button.action-btn.warning:hover {
+            background: rgba(255, 170, 0, 0.3);
+            box-shadow: 0 0 12px rgba(255, 170, 0, 0.5);
+        }
+
+        .status-banner {
+            background: rgba(0, 40, 75, 0.5);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            padding: 9px;
+            border-radius: 3px;
+            font-family: var(--font-display);
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 14px;
+            color: var(--neon-cyan);
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+        }
+
+        /* Secciones HUD */
+        .ai-panel-section {
+            background: var(--hud-panel-bg);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            border-radius: 4px;
+            padding: 13px 15px;
+            margin-bottom: 12px;
+            box-shadow: inset 0 0 10px rgba(0, 100, 200, 0.15);
+        }
+
+        .ai-sec-header {
+            font-family: var(--font-display);
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+
+        .ai-sec-header::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            background: var(--neon-cyan);
+            box-shadow: 0 0 6px var(--neon-cyan);
+            border-radius: 1px;
+            display: inline-block;
+        }
+
+        .ai-sec-desc {
+            font-size: 0.72rem;
+            color: #6da2bf;
+            margin-bottom: 10px;
+        }
+
+        .ai-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+            font-size: 0.82rem;
+        }
+
+        .ai-row:last-child {
+            border-bottom: none;
+        }
+
+        .ai-row .val {
+            font-weight: 700;
+            color: var(--neon-cyan);
+            font-family: var(--font-display);
+            font-size: 0.8rem;
+        }
+
+        /* Comparación */
+        .comparison-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .comp-card {
+            background: rgba(3, 14, 26, 0.85);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            border-radius: 3px;
+            padding: 9px 11px;
+        }
+
+        .comp-card-title {
+            font-family: var(--font-display);
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .comp-card-title.color-1 { color: var(--neon-cyan); }
+        .comp-card-title.color-1::before { content: ""; width: 5px; height: 5px; background: var(--neon-cyan); border-radius: 1px; }
+        
+        .comp-card-title.color-2 { color: var(--neon-amber); }
+        .comp-card-title.color-2::before { content: ""; width: 5px; height: 5px; background: var(--neon-amber); border-radius: 1px; }
+
+        .comp-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.76rem;
+            color: #8dbed9;
+            margin-bottom: 3px;
+        }
+
+        .saving-box {
+            background: rgba(0, 255, 136, 0.08);
+            border: 1px solid rgba(0, 255, 136, 0.4);
+            color: var(--neon-green);
+            text-align: center;
+            padding: 6px;
+            border-radius: 3px;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 0.78rem;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+        }
+
+        .bar-container {
+            margin-bottom: 6px;
+        }
+
+        .bar-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.72rem;
+            color: #72b2d1;
+            margin-bottom: 2px;
+        }
+
+        .progress-bar-bg {
+            background: rgba(3, 14, 26, 0.9);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            border-radius: 2px;
+            height: 5px;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .fill-blue { background: var(--neon-cyan); box-shadow: 0 0 8px var(--neon-cyan); }
+        .fill-orange { background: var(--neon-amber); box-shadow: 0 0 8px var(--neon-amber); }
+
+        /* Análisis de Columnas */
+        .column-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .col-item {
+            background: rgba(3, 14, 26, 0.75);
+            border: 1px solid rgba(0, 240, 255, 0.15);
+            border-radius: 3px;
+            padding: 6px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.78rem;
+        }
+
+        .col-item.best {
+            border-color: var(--neon-green);
+            background: rgba(0, 255, 136, 0.08);
+            box-shadow: inset 0 0 8px rgba(0, 255, 136, 0.15);
+        }
+
+        .col-name {
+            color: #78aabf;
+            font-family: var(--font-display);
+            font-size: 0.72rem;
+        }
+
+        .col-value-eval {
+            font-weight: 700;
+            color: var(--neon-cyan);
+            font-family: var(--font-display);
+            font-size: 0.75rem;
+        }
+
+        .col-value-eval.best-val {
+            color: var(--neon-green);
+            text-shadow: 0 0 6px rgba(0, 255, 136, 0.6);
+        }
+
+        .col-value-eval.pruned {
+            color: #557285;
+            font-weight: normal;
+        }
+
+        /* Experimentos Tablas */
+        .exp-section { margin-bottom: 18px; }
+        .exp-title { color: var(--neon-cyan); font-family: var(--font-display); font-size: 0.85rem; margin-bottom: 6px; letter-spacing: 1px; }
+        table.exp-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+            background: rgba(3, 14, 26, 0.85);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        table.exp-table th, table.exp-table td {
+            padding: 7px 9px;
+            text-align: left;
+            border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+        }
+        table.exp-table th { background: rgba(0, 35, 65, 0.8); color: #72b2d1; font-family: var(--font-display); font-size: 0.72rem; }
+        table.exp-table tr:last-child td { border-bottom: none; }
+    </style>
+</head>
+<body>
+
+    <h1>TERMINAL DE CONTROL // CONECTA-4</h1>
+    <p class="subtitle">Análisis Heurístico y Decisiones Adversarias [Semana 04]</p>
+
+    <!-- Barra de Navegación Segmentada -->
+    <div class="segmented-nav">
+        <button class="nav-btn active" onclick="switchTab('humano-ia')">Humano vs IA</button>
+        <button class="nav-btn" onclick="switchTab('ia-ia')">IA vs IA</button>
+        <button class="nav-btn" onclick="switchTab('experimentos')">Experimentos</button>
+    </div>
+
+    <div class="content-container">
+
+        <!-- ========================================== -->
+        <!-- MÓDULO 1: HUMANO VS IA                     -->
+        <!-- ========================================== -->
+        <div id="tab-humano-ia" class="tab-panel active">
+            <div class="layout-grid">
+                <!-- Tablero Interactivo -->
+                <div class="card">
+                    <div id="h-status-banner" class="status-banner">TU TURNO // PILOTO [ROJAS - X]</div>
+                    <div class="board-wrapper">
+                        <div id="h-board" class="board-grid"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="h-agent-select">Rival Computacional:</label>
+                        <select id="h-agent-select">
+                            <option value="alfabeta">Alfa-Beta (Minimax con Poda)</option>
+                            <option value="minimax">Minimax Clásico (Exhaustivo)</option>
+                            <option value="dfs">DFS (Búsqueda en Profundidad)</option>
+                            <option value="bfs">BFS (Búsqueda en Anchura)</option>
+                            <option value="aleatorio">Aleatorio (Estocástico)</option>
+                        </select>
+                    </div>
+                    <div class="btn-row">
+                        <button class="action-btn" onclick="hNuevaPartida()">Reiniciar Enlace</button>
+                        <button class="action-btn secondary" id="h-btn-pause" onclick="hTogglePausa()">Pausar</button>
+                    </div>
+                </div>
+
+                <!-- Métricas Humano vs IA -->
+                <div class="card">
+                    <div class="ai-panel-section">
+                        <div class="ai-sec-header">Telemetría del Rival IA</div>
+                        <div class="ai-sec-desc" id="h-metric-sub">Esperando primer vector de ataque...</div>
+                        <div class="ai-row"><span>Agente</span><span class="val" id="h-metric-agent">ALFA-BETA</span></div>
+                        <div class="ai-row"><span>Nodos explorados</span><span class="val" id="h-metric-nodes">0</span></div>
+                        <div class="ai-row"><span>Tiempo de cómputo</span><span class="val" id="h-metric-time">0.00 ms</span></div>
+                        <div class="ai-row"><span>Trayectoria elegida</span><span class="val" id="h-metric-move">-</span></div>
+                        <div class="ai-row"><span>Utilidad / Posición</span><span class="val" id="h-metric-val">0.00</span></div>
+                    </div>
+
+                    <!-- Análisis de Columnas para Humano vs IA -->
+                    <div class="ai-panel-section" style="margin-bottom: 0;">
+                        <div class="ai-sec-header">Análisis Táctico de Columnas</div>
+                        <div class="ai-sec-desc">Valores asignados a cada vector de despliegue en el último turno.</div>
+                        <div class="column-list" id="h-column-analysis-list">
+                            <div style="font-size: 0.75rem; color: #557285; text-align: center; padding: 10px;">Despliega una ficha para inicializar el escaneo.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- MÓDULO 2: IA VS IA (PANEL DE ANÁLISIS)     -->
+        <!-- ========================================== -->
+        <div id="tab-ia-ia" class="tab-panel">
+            <div class="layout-grid">
+                <!-- Tablero y Controles de Simulación -->
+                <div class="card">
+                    <div id="ai-status-banner" class="status-banner">SIMULACIÓN IA vs IA // SISTEMA EN ESPERA</div>
+                    <div class="board-wrapper">
+                        <div id="ai-board" class="board-grid"></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Unidad 1 [X - Rojas]:</label>
+                            <select id="ai-ag1-select" onchange="aiCambioConfiguracion()">
+                                <option value="dfs">DFS</option>
+                                <option value="bfs">BFS</option>
+                                <option value="minimax">Minimax</option>
+                                <option value="alfabeta" selected>Alfa-Beta</option>
+                                <option value="aleatorio">Aleatorio</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Unidad 2 [O - Amarillas]:</label>
+                            <select id="ai-ag2-select" onchange="aiCambioConfiguracion()">
+                                <option value="dfs">DFS</option>
+                                <option value="bfs" selected>BFS</option>
+                                <option value="minimax">Minimax</option>
+                                <option value="alfabeta">Alfa-Beta</option>
+                                <option value="aleatorio">Aleatorio</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Selector de Velocidad -->
+                    <div class="form-group">
+                        <label>Frecuencia de Simulación:</label>
+                        <select id="ai-speed-select" onchange="aiCambiarVelocidad()">
+                            <option value="1500">Baja [1.5 s]</option>
+                            <option value="800" selected>Nominal [800 ms]</option>
+                            <option value="300">Alta [300 ms]</option>
+                            <option value="80">Overclock [80 ms]</option>
+                        </select>
+                    </div>
+
+                    <div class="btn-row">
+                        <button class="action-btn" id="ai-btn-play" onclick="aiToggleAutoPlay()">Iniciar Simulación</button>
+                        <button class="action-btn secondary" onclick="aiPasoSiguiente()">Ciclo Único</button>
+                        <button class="action-btn warning" onclick="aiReiniciarPartida()">Reiniciar</button>
+                    </div>
+                </div>
+
+                <!-- Panel de Métricas y Desempeño Dinámico -->
+                <div class="card">
+                    <!-- Recuadro 1: Algoritmo Actual -->
+                    <div class="ai-panel-section">
+                        <div class="ai-sec-header" id="ai-sec-alg-title">Unidad Activa: Alfa-Beta (X)</div>
+                        <div class="ai-sec-desc" id="ai-sec-alg-sub">Profundidad Límite: 4 · Estado en Espera</div>
+                        <div class="ai-row">
+                            <span>Nodos evaluados</span>
+                            <span class="val" id="ai-stat-nodes">0</span>
+                        </div>
+                        <div class="ai-row">
+                            <span>Tiempo de cómputo</span>
+                            <span class="val" id="ai-stat-time">0.00 ms</span>
+                        </div>
+                        <div class="ai-row">
+                            <span>Valor de la posición</span>
+                            <span class="val" id="ai-stat-val">0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Recuadro 2: Comparación Dinámica entre los dos Agentes Elegidos -->
+                    <div class="ai-panel-section">
+                        <div class="ai-sec-header" id="comp-header-title">Comparación de Búsqueda</div>
+                        <div class="ai-sec-desc" id="comp-header-desc">Evaluación del mismo estado por los dos modelos seleccionados.</div>
+
+                        <div class="comparison-cards">
+                            <div class="comp-card">
+                                <div class="comp-card-title color-1" id="comp-card1-title">Unidad 1</div>
+                                <div class="comp-row"><span>Nodos</span><strong id="comp-m1-nodes">0</strong></div>
+                                <div class="comp-row"><span>Tiempo</span><strong id="comp-m1-time">0.0 ms</strong></div>
+                            </div>
+                            <div class="comp-card">
+                                <div class="comp-card-title color-2" id="comp-card2-title">Unidad 2</div>
+                                <div class="comp-row"><span>Nodos</span><strong id="comp-m2-nodes">0</strong></div>
+                                <div class="comp-row"><span id="comp-m2-extra-label">Diferencia</span><strong id="comp-m2-extra-val">0</strong></div>
+                                <div class="comp-row"><span>Tiempo</span><strong id="comp-m2-time">0.0 ms</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="saving-box" id="comp-savings-box">
+                            Diferencia de exploración: 0.0%
+                        </div>
+
+                        <div class="bar-container">
+                            <div class="bar-label-row">
+                                <span id="comp-bar-m1-lbl">Estados Unidad 1</span>
+                                <strong id="comp-bar-m1-val">0</strong>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill fill-blue" id="comp-bar-m1-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="bar-container">
+                            <div class="bar-label-row">
+                                <span id="comp-bar-m2-lbl">Estados Unidad 2</span>
+                                <strong id="comp-bar-m2-val">0</strong>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill fill-orange" id="comp-bar-m2-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recuadro 3: Análisis de Columnas -->
+                    <div class="ai-panel-section" style="margin-bottom: 0;">
+                        <div class="ai-sec-header">Análisis de Despliegue</div>
+                        <div class="ai-sec-desc">Valor obtenido por vector. Ramas podadas se catalogan como PODADA.</div>
+
+                        <div class="column-list" id="ai-column-analysis-list">
+                            <div style="font-size: 0.75rem; color: #557285; text-align: center; padding: 10px;">Inicia la simulación para inspeccionar las columnas.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- MÓDULO 3: EXPERIMENTOS                     -->
+        <!-- ========================================== -->
+        <div id="tab-experimentos" class="tab-panel">
+            <div class="layout-grid">
+                <!-- Tablero en Tiempo Real para Exp 1 y 2 -->
+                <div class="card">
+                    <div id="exp-status-banner" class="status-banner">MATRIZ EXPERIMENTAL DE EVALUACIÓN</div>
+                    <div class="board-wrapper">
+                        <div id="exp-board" class="board-grid"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Configuración de Estado Inicial/Intermedio:</label>
+                        <select id="exp-state-select" onchange="expCambiarEstado()">
+                            <option value="inicial">Estado Inicial (Matriz Vacía)</option>
+                            <option value="intermedio">Estado Intermedio (3 Jugadas: Col 3, Col 3, Col 2)</option>
+                        </select>
+                    </div>
+                    <div class="btn-row">
+                        <button class="action-btn" onclick="ejecutarBateriaExperimentos()">Ejecutar Batería de Pruebas</button>
+                    </div>
+                    <div style="margin-top: 15px; font-size: 0.75rem; color: #6da2bf;">
+                        * El tablero proyectará las jugadas en tiempo real durante los experimentos 1 y 2[cite: 1].
+                    </div>
+                </div>
+
+                <!-- Tablas de Resultados -->
+                <div class="card">
+                    <!-- Exp 1 -->
+                    <div class="exp-section">
+                        <div class="exp-title">EXP 1 // Costo de Jugada (Tabla 2)[cite: 1]</div>
+                        <table class="exp-table">
+                            <thead>
+                                <tr>
+                                    <th>Agente</th>
+                                    <th>Jugada</th>
+                                    <th>Nodos</th>
+                                    <th>Tiempo (ms)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>DFS</td><td id="e1-dfs-j">-</td><td id="e1-dfs-n">-</td><td id="e1-dfs-t">-</td></tr>
+                                <tr><td>BFS</td><td id="e1-bfs-j">-</td><td id="e1-bfs-n">-</td><td id="e1-bfs-t">-</td></tr>
+                                <tr><td>Minimax</td><td id="e1-mm-j">-</td><td id="e1-mm-n">-</td><td id="e1-mm-t">-</td></tr>
+                                <tr><td>Alfa-Beta</td><td id="e1-ab-j">-</td><td id="e1-ab-n">-</td><td id="e1-ab-t">-</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Exp 2 -->
+                    <div class="exp-section">
+                        <div class="exp-title">EXP 2 // Orden de Sucesores en Alfa-Beta (Tabla 3)[cite: 1]</div>
+                        <table class="exp-table">
+                            <thead>
+                                <tr>
+                                    <th>Orden</th>
+                                    <th>Jugada</th>
+                                    <th>Nodos</th>
+                                    <th>Tiempo</th>
+                                    <th>% Nodos vs Minimax</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Natural</td><td id="e2-nat-j">-</td><td id="e2-nat-n">-</td><td id="e2-nat-t">-</td><td id="e2-nat-p">-</td></tr>
+                                <tr><td>Aleatorio</td><td id="e2-rnd-j">-</td><td id="e2-rnd-n">-</td><td id="e2-rnd-t">-</td><td id="e2-rnd-p">-</td></tr>
+                                <tr><td>Mejor Primero</td><td id="e2-best-j">-</td><td id="e2-best-n">-</td><td id="e2-best-t">-</td><td id="e2-best-p">-</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Exp 3 -->
+                    <div class="exp-section" style="margin-bottom: 0;">
+                        <div class="exp-title">EXP 3 // Torneos Adversarios (Tabla 4)[cite: 1]</div>
+                        <table class="exp-table">
+                            <thead>
+                                <tr>
+                                    <th>Enfrentamiento</th>
+                                    <th>Partidas</th>
+                                    <th>Gana 1°</th>
+                                    <th>Gana 2°</th>
+                                    <th>Empates</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>DFS vs. Aleatorio</td><td>20</td><td id="t-dfs-rnd-1">-</td><td id="t-dfs-rnd-2">-</td><td id="t-dfs-rnd-e">-</td></tr>
+                                <tr><td>BFS vs. Aleatorio</td><td>20</td><td id="t-bfs-rnd-1">-</td><td id="t-bfs-rnd-2">-</td><td id="t-bfs-rnd-e">-</td></tr>
+                                <tr><td>Minimax vs. Aleatorio</td><td>20</td><td id="t-mm-rnd-1">-</td><td id="t-mm-rnd-2">-</td><td id="t-mm-rnd-e">-</td></tr>
+                                <tr><td>Alfa-Beta vs. Aleatorio</td><td>20</td><td id="t-ab-rnd-1">-</td><td id="t-ab-rnd-2">-</td><td id="t-ab-rnd-e">-</td></tr>
+                                <tr><td>Aleatorio vs. Alfa-Beta</td><td>20</td><td id="t-rnd-ab-1">-</td><td id="t-rnd-ab-2">-</td><td id="t-rnd-ab-e">-</td></tr>
+                                <tr><td>DFS vs. Alfa-Beta</td><td>3</td><td id="t-dfs-ab-1">-</td><td id="t-dfs-ab-2">-</td><td id="t-dfs-ab-e">-</td></tr>
+                                <tr><td>Alfa-Beta vs. DFS</td><td>3</td><td id="t-ab-dfs-1">-</td><td id="t-ab-dfs-2">-</td><td id="t-ab-dfs-e">-</td></tr>
+                                <tr><td>Minimax vs. Alfa-Beta</td><td>3</td><td id="t-mm-ab-1">-</td><td id="t-mm-ab-2">-</td><td id="t-mm-ab-e">-</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ==========================================
+        // CONTROL DE TABS / NAVEGACIÓN
+        // ==========================================
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+            document.getElementById('tab-' + tabId).classList.add('active');
+            const btns = document.querySelectorAll('.nav-btn');
+            if (tabId === 'humano-ia') btns[0].classList.add('active');
+            if (tabId === 'ia-ia') {
+                btns[1].classList.add('active');
+                aiActualizarCabecerasComparacion();
+            }
+            if (tabId === 'experimentos') btns[2].classList.add('active');
+        }
+
+        // ==========================================
+        // MODELO FORMAL DE CONECTA 4 (6 FUNCIONES)
+        // ==========================================
+        const ROWS = 6;
+        const COLS = 7;
+        const X = "X"; // Jugador 1 (MAX, +1)
+        const O = "O"; // Jugador 2 (MIN, -1)
+        const EMPTY = null;
+        const DEPTH_LIMIT = 4;
+
+        let NODOS = [0];
+
+        function inicial() {
+            const tablero = [];
+            for (let r = 0; r < ROWS; r++) {
+                const fila = [];
+                for (let c = 0; c < COLS; c++) fila.push(EMPTY);
+                tablero.push(fila);
+            }
+            return { tablero, turno: X };
+        }
+
+        function jugador(estado) {
+            return estado.turno;
+        }
+
+        function acciones(estado) {
+            const acts = [];
+            for (let c = 0; c < COLS; c++) {
+                if (estado.tablero[0][c] === EMPTY) acts.push(c);
+            }
+            return acts;
+        }
+
+        function resultado(estado, col) {
+            const nuevoTablero = estado.tablero.map(r => [...r]);
+            const actual = jugador(estado);
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (nuevoTablero[r][col] === EMPTY) {
+                    nuevoTablero[r][col] = actual;
+                    break;
+                }
+            }
+            return {
+                tablero: nuevoTablero,
+                turno: (actual === X) ? O : X
+            };
+        }
+
+        function checkGanador(tablero) {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    let p = tablero[r][c];
+                    if (p && p === tablero[r][c+1] && p === tablero[r][c+2] && p === tablero[r][c+3]) return p;
+                }
+            }
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    let p = tablero[r][c];
+                    if (p && p === tablero[r+1][c] && p === tablero[r+2][c] && p === tablero[r+3][c]) return p;
+                }
+            }
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    let p = tablero[r][c];
+                    if (p && p === tablero[r+1][c+1] && p === tablero[r+2][c+2] && p === tablero[r+3][c+3]) return p;
+                }
+            }
+            for (let r = 3; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    let p = tablero[r][c];
+                    if (p && p === tablero[r-1][c+1] && p === tablero[r-2][c+2] && p === tablero[r-3][c+3]) return p;
+                }
+            }
+            return null;
+        }
+
+        function terminal(estado) {
+            if (checkGanador(estado.tablero) !== null) return true;
+            return acciones(estado).length === 0;
+        }
+
+        function evalHeuristica(tablero) {
+            let score = 0;
+            const evalVentana = (w) => {
+                let xC = w.filter(c => c === X).length;
+                let oC = w.filter(c => c === O).length;
+                let eC = w.filter(c => c === EMPTY).length;
+                if (xC === 4) return 100;
+                if (oC === 4) return -100;
+                if (xC === 3 && eC === 1) return 5;
+                if (xC === 2 && eC === 2) return 2;
+                if (oC === 3 && eC === 1) return -5;
+                if (oC === 2 && eC === 2) return -2;
+                return 0;
+            };
+
+            const centro = Math.floor(COLS / 2);
+            let cX = 0, cO = 0;
+            for (let r = 0; r < ROWS; r++) {
+                if (tablero[r][centro] === X) cX++;
+                if (tablero[r][centro] === O) cO++;
+            }
+            score += (cX - cO) * 3;
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) score += evalVentana([tablero[r][c], tablero[r][c+1], tablero[r][c+2], tablero[r][c+3]]);
+            }
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS; c++) score += evalVentana([tablero[r][c], tablero[r+1][c], tablero[r+2][c], tablero[r+3][c]]);
+            }
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS - 3; c++) score += evalVentana([tablero[r][c], tablero[r+1][c+1], tablero[r+2][c+2], tablero[r+3][c+3]]);
+            }
+            for (let r = 3; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) score += evalVentana([tablero[r][c], tablero[r-1][c+1], tablero[r-2][c+2], tablero[r-3][c+3]]);
+            }
+            return Math.tanh(score / 30) * 0.9;
+        }
+
+        function utilidad(estado) {
+            const w = checkGanador(estado.tablero);
+            if (w === X) return 1.0;
+            if (w === O) return -1.0;
+            if (terminal(estado)) return 0.0;
+            return evalHeuristica(estado.tablero);
+        }
+
+        const juego = { inicial, jugador, acciones, resultado, terminal, utilidad };
+
+        function gana(juego, s, yo) {
+            const u = juego.utilidad(s);
+            return (yo === X) ? u === 1.0 : u === -1.0;
+        }
+
+        // ==========================================
+        // 5 AGENTES INTELIGENTES
+        // ==========================================
+        function dfs(juego, s, maxDepth = 6) {
+            const yo = juego.jugador(s);
+            function explora(e, d) {
+                NODOS[0]++;
+                if (juego.terminal(e)) return gana(juego, e, yo);
+                if (d <= 0) return false;
+                for (const a of juego.acciones(e)) {
+                    if (explora(juego.resultado(e, a), d - 1)) return true;
+                }
+                return false;
+            }
+            const acts = juego.acciones(s);
+            for (const a of acts) {
+                if (explora(juego.resultado(s, a), maxDepth)) return a;
+            }
+            return acts[0];
+        }
+
+        function bfs(juego, s, maxNodes = 3500) {
+            const yo = juego.jugador(s);
+            const acts = juego.acciones(s);
+            const cola = [];
+            for (const a of acts) cola.push({ estado: juego.resultado(s, a), primera: a, d: 1 });
+            let exp = 0;
+            while (cola.length > 0 && exp < maxNodes) {
+                const item = cola.shift();
+                exp++;
+                NODOS[0]++;
+                if (juego.terminal(item.estado)) {
+                    if (gana(juego, item.estado, yo)) return item.primera;
+                    continue;
+                }
+                if (item.d < 5) {
+                    for (const a of juego.acciones(item.estado)) {
+                        cola.push({ estado: juego.resultado(item.estado, a), primera: item.primera, d: item.d + 1 });
+                    }
+                }
+            }
+            return acts[0];
+        }
+
+        function minimax(juego, s, depth = DEPTH_LIMIT) {
+            function max_valor(e, d) {
+                NODOS[0]++;
+                if (d === 0 || juego.terminal(e)) return juego.utilidad(e);
+                let v = -Infinity;
+                for (const a of juego.acciones(e)) v = Math.max(v, min_valor(juego.resultado(e, a), d - 1));
+                return v;
+            }
+            function min_valor(e, d) {
+                NODOS[0]++;
+                if (d === 0 || juego.terminal(e)) return juego.utilidad(e);
+                let v = Infinity;
+                for (const a of juego.acciones(e)) v = Math.min(v, max_valor(juego.resultado(e, a), d - 1));
+                return v;
+            }
+
+            const acts = juego.acciones(s);
+            const esMax = (juego.jugador(s) === X);
+            let mejorA = acts[0];
+            let mejorV = esMax ? -Infinity : Infinity;
+
+            for (const a of acts) {
+                const prox = juego.resultado(s, a);
+                const val = esMax ? min_valor(prox, depth - 1) : max_valor(prox, depth - 1);
+                if (esMax && val > mejorV) { mejorV = val; mejorA = a; }
+                else if (!esMax && val < mejorV) { mejorV = val; mejorA = a; }
+            }
+            return mejorA;
+        }
+
+        function alfabeta(juego, s, ordenar = null, depth = DEPTH_LIMIT) {
+            function max_valor(e, alfa, beta, d) {
+                NODOS[0]++;
+                if (d === 0 || juego.terminal(e)) return juego.utilidad(e);
+                let v = -Infinity;
+                let acts = juego.acciones(e);
+                if (ordenar) acts = ordenar(juego, e, acts);
+                for (const a of acts) {
+                    v = Math.max(v, min_valor(juego.resultado(e, a), alfa, beta, d - 1));
+                    if (v >= beta) return v;
+                    alfa = Math.max(alfa, v);
+                }
+                return v;
+            }
+            function min_valor(e, alfa, beta, d) {
+                NODOS[0]++;
+                if (d === 0 || juego.terminal(e)) return juego.utilidad(e);
+                let v = Infinity;
+                let acts = juego.acciones(e);
+                if (ordenar) acts = ordenar(juego, e, acts);
+                for (const a of acts) {
+                    v = Math.min(v, max_valor(juego.resultado(e, a), alfa, beta, d - 1));
+                    if (v <= alfa) return v;
+                    beta = Math.min(beta, v);
+                }
+                return v;
+            }
+
+            let acts = juego.acciones(s);
+            if (ordenar) acts = ordenar(juego, s, acts);
+            const esMax = (juego.jugador(s) === X);
+            let mejorA = acts[0];
+            let mejorV = esMax ? -Infinity : Infinity;
+            let alfa = -Infinity, beta = Infinity;
+
+            for (const a of acts) {
+                const prox = juego.resultado(s, a);
+                const val = esMax ? min_valor(prox, alfa, beta, depth - 1) : max_valor(prox, alfa, beta, depth - 1);
+                if (esMax) {
+                    if (val > mejorV) { mejorV = val; mejorA = a; }
+                    alfa = Math.max(alfa, mejorV);
+                } else {
+                    if (val < mejorV) { mejorV = val; mejorA = a; }
+                    beta = Math.min(beta, mejorV);
+                }
+            }
+            return mejorA;
+        }
+
+        function aleatorio(juego, s) {
+            const acts = juego.acciones(s);
+            return acts[Math.floor(Math.random() * acts.length)];
+        }
+
+        function ordenAleatorio(juego, e, acts) {
+            const c = [...acts];
+            for (let i = c.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [c[i], c[j]] = [c[j], c[i]];
+            }
+            return c;
+        }
+
+        function ordenMejorPrimero(juego, e, acts) {
+            const centro = Math.floor(COLS / 2);
+            return [...acts].sort((a, b) => Math.abs(a - centro) - Math.abs(b - centro));
+        }
+
+        function resolverAgente(nombre) {
+            if (nombre === "dfs") return { fn: dfs, name: "DFS" };
+            if (nombre === "bfs") return { fn: bfs, name: "BFS" };
+            if (nombre === "minimax") return { fn: minimax, name: "Minimax" };
+            if (nombre === "aleatorio") return { fn: aleatorio, name: "Aleatorio" };
+            return { fn: (j, s) => alfabeta(j, s, ordenMejorPrimero), name: "Alfa-Beta" };
+        }
+
+        function medir(juego, agente, s, ...args) {
+            NODOS[0] = 0;
+            const t0 = performance.now();
+            const a = agente(juego, s, ...args);
+            const ms = performance.now() - t0;
+            return { jugada: a, nodos: NODOS[0], tiempo: ms };
+        }
+
+        function torneo(juego, ag1, ag2, n) {
+            let g1 = 0, g2 = 0, emp = 0;
+            for (let i = 0; i < n; i++) {
+                let s = juego.inicial();
+                while (!juego.terminal(s)) {
+                    const actual = juego.jugador(s);
+                    const jug = (actual === X) ? ag1(juego, s) : ag2(juego, s);
+                    s = juego.resultado(s, jug);
+                }
+                const w = checkGanador(s.tablero);
+                if (w === X) g1++;
+                else if (w === O) g2++;
+                else emp++;
+            }
+            return { g1, g2, emp };
+        }
+
+        // ==========================================
+        // MÓDULO 1: HUMANO VS IA
+        // ==========================================
+        let hState = juego.inicial();
+        let hBloqueado = false;
+        let hPausado = false;
+
+        function hRenderBoard() {
+            const el = document.getElementById("h-board");
+            el.innerHTML = "";
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cell = document.createElement("div");
+                    cell.className = "cell interactive";
+                    if (hState.tablero[r][c] === X) cell.classList.add("player-x");
+                    if (hState.tablero[r][c] === O) cell.classList.add("player-o");
+                    cell.addEventListener("click", () => hClickColumna(c));
+                    el.appendChild(cell);
+                }
+            }
+        }
+
+        function renderColumnAnalysis(containerId, estado, mejorCol, podados = 0) {
+            const acts = juego.acciones(estado);
+            const colListEl = document.getElementById(containerId);
+            colListEl.innerHTML = "";
+
+            for (let c = 0; c < COLS; c++) {
+                if (!acts.includes(c)) continue;
+                const prox = juego.resultado(estado, c);
+                const valCol = juego.utilidad(prox).toFixed(2);
+
+                const item = document.createElement("div");
+                const isBest = (c === mejorCol);
+                item.className = `col-item ${isBest ? 'best' : ''}`;
+
+                let htmlVal = "";
+                if (isBest) {
+                    htmlVal = `<span class="col-value-eval best-val">VAL: ${valCol} ★ MEJOR</span>`;
+                } else {
+                    const ordenados = ordenMejorPrimero(juego, estado, acts);
+                    const idx = ordenados.indexOf(c);
+                    if (idx > 2 && podados > 50) {
+                        htmlVal = `<span class="col-value-eval pruned">PODADA <span style="font-size: 0.68rem;">(MM: ${valCol})</span></span>`;
+                    } else {
+                        htmlVal = `<span class="col-value-eval">VAL: ${valCol}</span>`;
+                    }
+                }
+
+                item.innerHTML = `<span class="col-name">COLUMNA ${c + 1}</span> ${htmlVal}`;
+                colListEl.appendChild(item);
+            }
+        }
+
+        function hClickColumna(col) {
+            if (hBloqueado || hPausado || juego.terminal(hState)) return;
+            if (hState.tablero[0][col] !== EMPTY) return;
+
+            hState = juego.resultado(hState, col);
+            hRenderBoard();
+
+            if (juego.terminal(hState)) {
+                hMostrarFin();
+                return;
+            }
+
+            hBloqueado = true;
+            const agId = document.getElementById("h-agent-select").value;
+            const ag = resolverAgente(agId);
+            document.getElementById("h-status-banner").textContent = `CALCULANDO RESPUESTA // ${ag.name.toUpperCase()}...`;
+
+            setTimeout(() => {
+                if (hPausado) return;
+                const res = medir(juego, ag.fn, hState);
+                const valActual = juego.utilidad(hState).toFixed(2);
+
+                document.getElementById("h-metric-agent").textContent = ag.name.toUpperCase();
+                document.getElementById("h-metric-sub").textContent = `Profundidad Límite: 4 · Turno de O`;
+                document.getElementById("h-metric-nodes").textContent = res.nodos.toLocaleString();
+                document.getElementById("h-metric-time").textContent = res.tiempo.toFixed(2) + " ms";
+                document.getElementById("h-metric-move").textContent = "COLUMNA " + (res.jugada + 1);
+                document.getElementById("h-metric-val").textContent = valActual;
+
+                renderColumnAnalysis("h-column-analysis-list", hState, res.jugada, 100);
+
+                hState = juego.resultado(hState, res.jugada);
+                hRenderBoard();
+
+                if (juego.terminal(hState)) {
+                    hMostrarFin();
+                } else {
+                    document.getElementById("h-status-banner").textContent = "TU TURNO // PILOTO [ROJAS - X]";
+                    hBloqueado = false;
+                }
+            }, 60);
+        }
+
+        function hMostrarFin() {
+            const w = checkGanador(hState.tablero);
+            const ban = document.getElementById("h-status-banner");
+            const finalVal = juego.utilidad(hState).toFixed(2);
+            document.getElementById("h-metric-val").textContent = `${finalVal} (${w ? 'Victoria ' + w : 'Empate'})`;
+
+            if (w === X) ban.textContent = "¡MISIÓN CUMPLIDA! VICTORIA DEL PILOTO [X]";
+            else if (w === O) ban.textContent = "¡AMENAZA CONFIRMADA! VICTORIA DE LA IA [O]";
+            else ban.textContent = "¡EQUILIBRIO TÁCTICO! TABLAS [EMPATE]";
+            hBloqueado = false;
+        }
+
+        function hNuevaPartida() {
+            hState = juego.inicial();
+            hBloqueado = false;
+            hPausado = false;
+            document.getElementById("h-btn-pause").textContent = "Pausar";
+            document.getElementById("h-status-banner").textContent = "TU TURNO // PILOTO [ROJAS - X]";
+            document.getElementById("h-metric-nodes").textContent = "0";
+            document.getElementById("h-metric-time").textContent = "0.00 ms";
+            document.getElementById("h-metric-move").textContent = "-";
+            document.getElementById("h-metric-val").textContent = "0.00";
+            document.getElementById("h-metric-sub").textContent = "Esperando primer vector de ataque...";
+            document.getElementById("h-column-analysis-list").innerHTML = '<div style="font-size: 0.75rem; color: #557285; text-align: center; padding: 10px;">Despliega una ficha para inicializar el escaneo.</div>';
+            hRenderBoard();
+        }
+
+        function hTogglePausa() {
+            hPausado = !hPausado;
+            const btn = document.getElementById("h-btn-pause");
+            if (hPausado) {
+                btn.textContent = "Reanudar";
+                document.getElementById("h-status-banner").textContent = "ENLACE PAUSADO";
+            } else {
+                btn.textContent = "Pausar";
+                document.getElementById("h-status-banner").textContent = (juego.jugador(hState) === X) ? "TU TURNO // PILOTO [ROJAS - X]" : "CÁLCULO IA EN CURSO";
+            }
+        }
+
+        // ==========================================
+        // MÓDULO 2: IA VS IA (ANÁLISIS DINÁMICO)
+        // ==========================================
+        let aiState = juego.inicial();
+        let aiTimer = null;
+
+        function aiCambiarVelocidad() {
+            if (aiTimer) {
+                clearInterval(aiTimer);
+                const vel = parseInt(document.getElementById("ai-speed-select").value);
+                aiTimer = setInterval(() => { aiPasoSiguiente(); }, vel);
+            }
+        }
+
+        function aiActualizarCabecerasComparacion() {
+            const ag1Key = document.getElementById("ai-ag1-select").value;
+            const ag2Key = document.getElementById("ai-ag2-select").value;
+            const ag1 = resolverAgente(ag1Key);
+            const ag2 = resolverAgente(ag2Key);
+
+            document.getElementById("comp-header-title").textContent = `Comparación: ${ag1.name} vs ${ag2.name}`;
+            document.getElementById("comp-card1-title").textContent = ag1.name;
+            document.getElementById("comp-card2-title").textContent = ag2.name;
+            document.getElementById("comp-bar-m1-lbl").textContent = `Estados ${ag1.name}`;
+            document.getElementById("comp-bar-m2-lbl").textContent = `Estados ${ag2.name}`;
+            document.getElementById("ai-sec-alg-title").textContent = `Unidad Activa: ${ag1.name} (X)`;
+        }
+
+        // CORRECCIÓN: Al cambiar selects NO ejecuta búsqueda prematura; limpia métricas y actualiza títulos
+        function aiCambioConfiguracion() {
+            aiActualizarCabecerasComparacion();
+            if (!aiTimer) {
+                document.getElementById("ai-stat-nodes").textContent = "0";
+                document.getElementById("ai-stat-time").textContent = "0.00 ms";
+                document.getElementById("ai-stat-val").textContent = "0.00";
+                document.getElementById("comp-m1-nodes").textContent = "0";
+                document.getElementById("comp-m1-time").textContent = "0.0 ms";
+                document.getElementById("comp-m2-nodes").textContent = "0";
+                document.getElementById("comp-m2-time").textContent = "0.0 ms";
+                document.getElementById("comp-m2-extra-val").textContent = "0";
+                document.getElementById("comp-savings-box").textContent = "Diferencia de exploración: 0.0%";
+                document.getElementById("comp-bar-m1-val").textContent = "0";
+                document.getElementById("comp-bar-m2-val").textContent = "0";
+                document.getElementById("comp-bar-m1-fill").style.width = "0%";
+                document.getElementById("comp-bar-m2-fill").style.width = "0%";
+                document.getElementById("ai-sec-alg-sub").textContent = "Profundidad Límite: 4 · Estado en Espera";
+                document.getElementById("ai-column-analysis-list").innerHTML = '<div style="font-size: 0.75rem; color: #557285; text-align: center; padding: 10px;">Inicia la simulación para inspeccionar las columnas.</div>';
+            }
+        }
+
+        function aiRenderBoard() {
+            const el = document.getElementById("ai-board");
+            el.innerHTML = "";
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cell = document.createElement("div");
+                    cell.className = "cell";
+                    if (aiState.tablero[r][c] === X) cell.classList.add("player-x");
+                    if (aiState.tablero[r][c] === O) cell.classList.add("player-o");
+                    el.appendChild(cell);
+                }
+            }
+        }
+
+        function analizarEstadoDinamico(estado) {
+            const ag1Key = document.getElementById("ai-ag1-select").value;
+            const ag2Key = document.getElementById("ai-ag2-select").value;
+            const ag1 = resolverAgente(ag1Key);
+            const ag2 = resolverAgente(ag2Key);
+
+            const res1 = medir(juego, ag1.fn, estado);
+            const res2 = medir(juego, ag2.fn, estado);
+
+            const turnoActual = juego.jugador(estado);
+            const esMax = (turnoActual === X);
+            const agenteActivo = esMax ? ag1 : ag2;
+            const resActivo = esMax ? res1 : res2;
+            const valPos = juego.utilidad(estado).toFixed(2);
+
+            // 1. Panel Algoritmo actual
+            document.getElementById("ai-sec-alg-title").textContent = `Unidad Activa: ${agenteActivo.name} (${turnoActual})`;
+            document.getElementById("ai-sec-alg-sub").textContent = `Profundidad Límite: 4 · Turno de ${turnoActual}`;
+            document.getElementById("ai-stat-nodes").textContent = resActivo.nodos.toLocaleString();
+            document.getElementById("ai-stat-time").textContent = resActivo.tiempo.toFixed(2) + " ms";
+            document.getElementById("ai-stat-val").textContent = valPos;
+
+            // 2. Comparación Dinámica
+            document.getElementById("comp-m1-nodes").textContent = res1.nodos.toLocaleString();
+            document.getElementById("comp-m1-time").textContent = res1.tiempo.toFixed(2) + " ms";
+
+            document.getElementById("comp-m2-nodes").textContent = res2.nodos.toLocaleString();
+            document.getElementById("comp-m2-time").textContent = res2.tiempo.toFixed(2) + " ms";
+
+            const diffNodos = Math.abs(res1.nodos - res2.nodos);
+            document.getElementById("comp-m2-extra-label").textContent = (ag1Key === "minimax" && ag2Key === "alfabeta") ? "Podados" : "Diferencia";
+            document.getElementById("comp-m2-extra-val").textContent = diffNodos.toLocaleString();
+
+            const maxNodos = Math.max(res1.nodos, res2.nodos, 1);
+            const pctAhorro = ((diffNodos / maxNodos) * 100).toFixed(1);
+            document.getElementById("comp-savings-box").textContent = `Diferencia de exploración: ${pctAhorro}%`;
+
+            document.getElementById("comp-bar-m1-val").textContent = res1.nodos.toLocaleString();
+            document.getElementById("comp-bar-m2-val").textContent = res2.nodos.toLocaleString();
+
+            document.getElementById("comp-bar-m1-fill").style.width = ((res1.nodos / maxNodos) * 100) + "%";
+            document.getElementById("comp-bar-m2-fill").style.width = ((res2.nodos / maxNodos) * 100) + "%";
+
+            // 3. Análisis de Columnas
+            renderColumnAnalysis("ai-column-analysis-list", estado, resActivo.jugada, diffNodos);
+
+            return resActivo.jugada;
+        }
+
+        function aiPasoSiguiente() {
+            if (juego.terminal(aiState)) {
+                const w = checkGanador(aiState.tablero);
+                const valFinal = juego.utilidad(aiState).toFixed(2);
+                document.getElementById("ai-status-banner").textContent = w ? `SIMULACIÓN CONCLUIDA // VICTORIA: ${w} (Utilidad: ${valFinal})` : `SIMULACIÓN CONCLUIDA // TABLAS (Utilidad: ${valFinal})`;
+                document.getElementById("ai-stat-val").textContent = valFinal;
+                if (aiTimer) { clearInterval(aiTimer); aiTimer = null; document.getElementById("ai-btn-play").textContent = "Iniciar Simulación"; }
+                return;
+            }
+
+            const jugada = analizarEstadoDinamico(aiState);
+            aiState = juego.resultado(aiState, jugada);
+            aiRenderBoard();
+
+            if (juego.terminal(aiState)) {
+                aiPasoSiguiente();
+            }
+        }
+
+        function aiToggleAutoPlay() {
+            const btn = document.getElementById("ai-btn-play");
+            if (aiTimer) {
+                clearInterval(aiTimer);
+                aiTimer = null;
+                btn.textContent = "Reanudar Simulación";
+            } else {
+                btn.textContent = "Pausar Simulación";
+                const vel = parseInt(document.getElementById("ai-speed-select").value);
+                aiTimer = setInterval(() => { aiPasoSiguiente(); }, vel);
+            }
+        }
+
+        function aiReiniciarPartida() {
+            if (aiTimer) { clearInterval(aiTimer); aiTimer = null; document.getElementById("ai-btn-play").textContent = "Iniciar Simulación"; }
+            aiState = juego.inicial();
+            document.getElementById("ai-status-banner").textContent = "SIMULACIÓN IA vs IA // SISTEMA EN ESPERA";
+            document.getElementById("ai-stat-nodes").textContent = "0";
+            document.getElementById("ai-stat-time").textContent = "0.00 ms";
+            document.getElementById("ai-stat-val").textContent = "0.00";
+            document.getElementById("comp-m1-nodes").textContent = "0";
+            document.getElementById("comp-m2-nodes").textContent = "0";
+            document.getElementById("comp-bar-m1-fill").style.width = "0%";
+            document.getElementById("comp-bar-m2-fill").style.width = "0%";
+            aiRenderBoard();
+            aiActualizarCabecerasComparacion();
+            document.getElementById("ai-column-analysis-list").innerHTML = '<div style="font-size: 0.75rem; color: #557285; text-align: center; padding: 10px;">Inicia la simulación para inspeccionar las columnas.</div>';
+        }
+
+        // ==========================================
+        // MÓDULO 3: EXPERIMENTOS
+        // ==========================================
+        let expState = juego.inicial();
+
+        function expRenderBoard() {
+            const el = document.getElementById("exp-board");
+            el.innerHTML = "";
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cell = document.createElement("div");
+                    cell.className = "cell";
+                    if (expState.tablero[r][c] === X) cell.classList.add("player-x");
+                    if (expState.tablero[r][c] === O) cell.classList.add("player-o");
+                    el.appendChild(cell);
+                }
+            }
+        }
+
+        function expCambiarEstado() {
+            const v = document.getElementById("exp-state-select").value;
+            if (v === "inicial") {
+                expState = juego.inicial();
+            } else {
+                let s = juego.inicial();
+                s = juego.resultado(s, 3);
+                s = juego.resultado(s, 3);
+                s = juego.resultado(s, 2);
+                expState = s;
+            }
+            document.getElementById("exp-status-banner").textContent = `MATRIZ DE PRUEBA // ESTADO: ${v.toUpperCase()}`;
+            expRenderBoard();
+        }
+
+        async function ejecutarBateriaExperimentos() {
+            document.getElementById("exp-status-banner").textContent = "PROCESANDO PROTOCOLO EXPERIMENTAL...";
+            const s = expState;
+
+            const medirProm = (ag, ...args) => {
+                let nodos = 0, tTotal = 0, j = null;
+                for (let i = 0; i < 3; i++) {
+                    const r = medir(juego, ag, s, ...args);
+                    nodos = r.nodos;
+                    tTotal += r.tiempo;
+                    j = r.jugada;
+                }
+                return { jugada: j, nodos, tiempo: tTotal / 3 };
+            };
+
+            // Exp 1
+            const rDFS = medirProm(dfs);
+            document.getElementById("e1-dfs-j").textContent = "Col " + (rDFS.jugada + 1);
+            document.getElementById("e1-dfs-n").textContent = rDFS.nodos;
+            document.getElementById("e1-dfs-t").textContent = rDFS.tiempo.toFixed(2);
+
+            const rBFS = medirProm(bfs);
+            document.getElementById("e1-bfs-j").textContent = "Col " + (rBFS.jugada + 1);
+            document.getElementById("e1-bfs-n").textContent = rBFS.nodos;
+            document.getElementById("e1-bfs-t").textContent = rBFS.tiempo.toFixed(2);
+
+            const rMM = medirProm(minimax);
+            document.getElementById("e1-mm-j").textContent = "Col " + (rMM.jugada + 1);
+            document.getElementById("e1-mm-n").textContent = rMM.nodos;
+            document.getElementById("e1-mm-t").textContent = rMM.tiempo.toFixed(2);
+
+            const rAB = medirProm(alfabeta, null);
+            document.getElementById("e1-ab-j").textContent = "Col " + (rAB.jugada + 1);
+            document.getElementById("e1-ab-n").textContent = rAB.nodos;
+            document.getElementById("e1-ab-t").textContent = rAB.tiempo.toFixed(2);
+
+            expState = juego.resultado(s, rAB.jugada);
+            expRenderBoard();
+
+            // Exp 2
+            const rNat = rAB;
+            document.getElementById("e2-nat-j").textContent = "Col " + (rNat.jugada + 1);
+            document.getElementById("e2-nat-n").textContent = rNat.nodos;
+            document.getElementById("e2-nat-t").textContent = rNat.tiempo.toFixed(2) + " ms";
+            document.getElementById("e2-nat-p").textContent = ((rNat.nodos / rMM.nodos) * 100).toFixed(1) + "%";
+
+            const rRnd = medirProm(alfabeta, ordenAleatorio);
+            document.getElementById("e2-rnd-j").textContent = "Col " + (rRnd.jugada + 1);
+            document.getElementById("e2-rnd-n").textContent = rRnd.nodos;
+            document.getElementById("e2-rnd-t").textContent = rRnd.tiempo.toFixed(2) + " ms";
+            document.getElementById("e2-rnd-p").textContent = ((rRnd.nodos / rMM.nodos) * 100).toFixed(1) + "%";
+
+            const rBest = medirProm(alfabeta, ordenMejorPrimero);
+            document.getElementById("e2-best-j").textContent = "Col " + (rBest.jugada + 1);
+            document.getElementById("e2-best-n").textContent = rBest.nodos;
+            document.getElementById("e2-best-t").textContent = rBest.tiempo.toFixed(2) + " ms";
+            document.getElementById("e2-best-p").textContent = ((rBest.nodos / rMM.nodos) * 100).toFixed(1) + "%";
+
+            // Exp 3 Torneos
+            const t1 = torneo(juego, dfs, aleatorio, 20);
+            document.getElementById("t-dfs-rnd-1").textContent = t1.g1;
+            document.getElementById("t-dfs-rnd-2").textContent = t1.g2;
+            document.getElementById("t-dfs-rnd-e").textContent = t1.emp;
+
+            const t2 = torneo(juego, bfs, aleatorio, 20);
+            document.getElementById("t-bfs-rnd-1").textContent = t2.g1;
+            document.getElementById("t-bfs-rnd-2").textContent = t2.g2;
+            document.getElementById("t-bfs-rnd-e").textContent = t2.emp;
+
+            const t3 = torneo(juego, minimax, aleatorio, 20);
+            document.getElementById("t-mm-rnd-1").textContent = t3.g1;
+            document.getElementById("t-mm-rnd-2").textContent = t3.g2;
+            document.getElementById("t-mm-rnd-e").textContent = t3.emp;
+
+            const t4 = torneo(juego, alfabeta, aleatorio, 20);
+            document.getElementById("t-ab-rnd-1").textContent = t4.g1;
+            document.getElementById("t-ab-rnd-2").textContent = t4.g2;
+            document.getElementById("t-ab-rnd-e").textContent = t4.emp;
+
+            const t5 = torneo(juego, aleatorio, alfabeta, 20);
+            document.getElementById("t-rnd-ab-1").textContent = t5.g1;
+            document.getElementById("t-rnd-ab-2").textContent = t5.g2;
+            document.getElementById("t-rnd-ab-e").textContent = t5.emp;
+
+            const t6 = torneo(juego, dfs, alfabeta, 3);
+            document.getElementById("t-dfs-ab-1").textContent = t6.g1;
+            document.getElementById("t-dfs-ab-2").textContent = t6.g2;
+            document.getElementById("t-dfs-ab-e").textContent = t6.emp;
+
+            const t7 = torneo(juego, alfabeta, dfs, 3);
+            document.getElementById("t-ab-dfs-1").textContent = t7.g1;
+            document.getElementById("t-ab-dfs-2").textContent = t7.g2;
+            document.getElementById("t-ab-dfs-e").textContent = t7.emp;
+
+            const t8 = torneo(juego, minimax, alfabeta, 3);
+            document.getElementById("t-mm-ab-1").textContent = t8.g1;
+            document.getElementById("t-mm-ab-2").textContent = t8.g2;
+            document.getElementById("t-mm-ab-e").textContent = t8.emp;
+
+            document.getElementById("exp-status-banner").textContent = "PROTOCOLO EXPERIMENTAL COMPLETADO [EXITOSO]";
+        }
+
+        // Inicialización
+        hRenderBoard();
+        aiRenderBoard();
+        expRenderBoard();
+        aiActualizarCabecerasComparacion();
+    </script>
+</body>
+</html>
